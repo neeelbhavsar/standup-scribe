@@ -10,9 +10,13 @@
 ## Features
 
 ✅ **Scan multiple repositories** — Recursively find all git repos in your workspace  
-✅ **Filter by date & author** — Show commits from the last N days, by author or team  
+✅ **Filter by date, author & branch** — Last N days, since your last workday, this week, or any date range  
+✅ **Monday-proof** — `--since yesterday` skips the weekend and shows Friday's work  
+✅ **Grouped by type** — `--group` sorts commits into Features, Fixes, Chores, … using conventional commits  
+✅ **Noise filters** — Hide merge commits and anything matching a pattern (`wip`, `chore(deps)`, …)  
 ✅ **Time estimation** — Automatically estimate hours spent based on commit timestamps  
 ✅ **Export formats** — Terminal output, markdown, JSON, CSV for docs and timesheets  
+✅ **Copy to clipboard** — `--copy` puts your standup on the clipboard, ready to paste into Slack  
 ✅ **Save preferences** — Remember your author, directories, and defaults  
 ✅ **CI-safe** — Quiet mode, no spinners, machine-readable JSON output  
 ✅ **Cross-platform** — Works on macOS, Linux, Windows
@@ -35,6 +39,12 @@ npx standup-scribe
 
 ```bash
 standup-scribe --days 2
+```
+
+### Monday morning: everything since Friday, grouped, on your clipboard
+
+```bash
+standup-scribe --since yesterday --group --no-merges --copy
 ```
 
 ### Show commits from the whole team (all authors)
@@ -65,15 +75,25 @@ standup-scribe [options]
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--days <N>` | `1` | Number of days to look back |
+| `-d, --days <N>` | `1` (or saved config) | Number of days to look back |
+| `-s, --since <when>` | — | Start date: `today`, `yesterday` (previous **workday**), or `YYYY-MM-DD` |
+| `-u, --until <when>` | now | End date, inclusive: `today`, `yesterday`, or `YYYY-MM-DD` |
+| `-w, --week` | — | This week so far (since Monday) |
+| `--last-week` | — | Last week, Monday to Sunday |
 | `-a, --author <name>` | (from git config) | Filter by author name |
 | `--all-authors` | — | Show commits from all authors (team standup) |
-| `--branch <name>` | — | Filter by branch name |
+| `--branch <name>` | — | Only commits reachable from this branch (local, or `origin/<name>`) |
+| `--no-merges` | — | Hide merge commits |
+| `-x, --exclude <pattern>` | — | Hide commits whose message matches this regex (case-insensitive, repeatable) |
+| `-g, --group` | — | Group commits by type: Features, Fixes, Chores, … |
 | `--dir <path>` | (current + home) | Scan directory (can be used multiple times) |
-| `--depth <N>` | `3` | Max depth for directory scanning |
+| `--depth <N>` | `3` (or saved config) | Max depth for directory scanning |
 | `-o, --output <format>` | `terminal` | Output format: `terminal`, `markdown`, `json`, `csv` |
 | `-f, --file <path>` | — | Save output to file |
+| `-c, --copy` | — | Copy the output to the clipboard (terminal output is copied without colors) |
 | `-q, --quiet` | — | Suppress spinners and colors (for CI/scripts) |
+
+**Date options:** `--week` / `--last-week` take priority over `--since` / `--until`, which take priority over `--days`.
 
 ### Config Command
 
@@ -89,6 +109,8 @@ standup-scribe config [options]
 | `--dir <path>` | Set default scan directories |
 | `--days <N>` | Set default days to look back |
 | `--depth <N>` | Set default scan depth |
+| `--exclude <pattern>` | Set default commit-message patterns to hide (repeatable; replaces the saved list) |
+| `--clear-exclude` | Remove all saved exclude patterns |
 
 > 📋 Looking for copy-paste recipes (daily/weekly reports, scheduling, sharing to Slack/email)? See [STANDUP-COMMANDS.md](./STANDUP-COMMANDS.md).
 
@@ -181,6 +203,7 @@ Output:
         {
           "hash": "abc1234",
           "message": "feat: add CRUD route generator",
+          "type": "feat",
           "author": {
             "name": "John Doe",
             "email": "john@example.com"
@@ -213,8 +236,10 @@ import { getStandup, formatMinutes } from 'standup-scribe';
 const result = await getStandup({
   dirs: ['~/projects', '~/work'],
   author: 'John Doe',
-  days: 2,
+  since: 'yesterday',       // previous workday — Friday on a Monday
   branch: 'main',
+  excludeMerges: true,
+  exclude: ['^wip', 'chore\\(deps\\)'],
 });
 
 console.log(`Found ${result.totalCommits} commits`);
@@ -236,6 +261,8 @@ interface StandupResult {
   startDate: string;        // ISO 8601
   endDate: string;          // ISO 8601
   allAuthors: boolean;
+  period?: string;          // e.g. "Last 2 days", "Since Fri Oct 23", "This week"
+  reposScanned?: number;    // repos found, including ones with no matching commits
 }
 
 interface Repository {
@@ -257,12 +284,20 @@ interface StandupOptions {
   dirs?: string[];
   author?: string;
   days?: number;
+  since?: string;           // "today", "yesterday" (previous workday), or YYYY-MM-DD
+  until?: string;           // same formats, inclusive
+  week?: boolean;           // since Monday
+  lastWeek?: boolean;       // last Monday to Sunday
   depth?: number;
   branch?: string;
   allAuthors?: boolean;
+  excludeMerges?: boolean;
+  exclude?: string[];       // regex patterns matched against commit messages
   quiet?: boolean;
 }
 ```
+
+Also exported: `groupCommitsByType`, `getCommitType`, `resolveDateRange`, `copyToClipboard`, plus the formatters and exporters.
 
 ## How Time Estimation Works
 
@@ -287,8 +322,11 @@ Your preferences are saved in:
 
 | OS | Path |
 |----|------|
-| macOS / Linux | `~/.config/standup-scribe/config.json` |
-| Windows | `%APPDATA%\standup-scribe\config.json` |
+| macOS | `~/Library/Preferences/standup-scribe-nodejs/config.json` |
+| Linux | `~/.config/standup-scribe-nodejs/config.json` |
+| Windows | `%APPDATA%\standup-scribe-nodejs\Config\config.json` |
+
+Run `standup-scribe config --show` to see the exact path on your machine.
 
 View or reset it:
 
@@ -364,6 +402,31 @@ Error: Git is not installed or not available in your PATH.
 Please install Git to use standup-scribe.
 ```
 
+### Q: It's Monday — how do I see Friday's work?
+
+Use `--since yesterday`. "Yesterday" means the previous **workday**, so on a Monday (or over the weekend) it starts from Friday:
+
+```bash
+standup-scribe --since yesterday
+```
+
+### Q: How do I hide merge commits, WIP commits, or dependency bumps?
+
+```bash
+standup-scribe --no-merges --exclude "^wip" --exclude "chore\(deps\)"
+```
+
+Patterns are case-insensitive regular expressions matched against the commit message. Save the ones you always want hidden:
+
+```bash
+standup-scribe config --exclude "^wip" --exclude "chore\(deps\)"
+standup-scribe config --clear-exclude   # remove them again
+```
+
+### Q: `--copy` says it couldn't copy to the clipboard
+
+On macOS and Windows it uses the built-in `pbcopy` / `clip`. On Linux, install one of `wl-clipboard` (Wayland), `xclip`, or `xsel`.
+
 ### Q: How do I scan multiple separate directories?
 
 Use multiple `--dir` flags:
@@ -415,7 +478,19 @@ MIT © 2026 [Neel Bhavsar](https://github.com/neeelbhavsar) — see [LICENSE](./
 
 ## Changelog
 
-### 1.0.0 (Unreleased)
+### 1.1.0 (Unreleased)
+
+- 📅 `--since` / `--until`, `--week`, and `--last-week` date ranges; `yesterday` means the previous workday, so Monday shows Friday
+- 🗂️ `--group` organizes commits by conventional commit type (Features, Fixes, Chores, …); JSON and CSV now include each commit's `type`
+- 🧹 `--no-merges` and `--exclude <pattern>` hide noise; exclude patterns can be saved with `config --exclude`
+- 📋 `--copy` copies the report to the clipboard (Unicode-safe on Windows)
+- 🐛 `--branch` now returns every commit on the branch, not just the latest one, and every commit gets a branch label
+- 🐛 Repeating `--dir` now scans every directory instead of only the last one
+- 🐛 Saved `days`, `depth`, and `author` from config are no longer overridden by CLI defaults
+- 🐛 "No repositories found" is no longer shown when repos were found but had no commits in range
+- 🐛 Stash entries no longer appear as commits
+
+### 1.0.0 (2026-10-24)
 
 - ✨ Initial release
 - 🎯 Scan multiple repos with recursive directory search

@@ -1,9 +1,15 @@
-import dayjs from 'dayjs';
+import path from 'path';
 import type { StandupOptions, StandupResult, Repository } from './types.js';
 import { scanForGitRepos } from './scanner.js';
-import { getCommitsFromRepo, getCurrentUser, isGitAvailable } from './commits.js';
+import {
+  getCommitsFromRepo,
+  getCurrentUser,
+  isGitAvailable,
+  compileExcludePatterns,
+} from './commits.js';
 import { estimateTimeSpent } from './estimator.js';
 import { configManager } from './config.js';
+import { resolveDateRange } from './dates.js';
 
 /**
  * Main API function to get standup data
@@ -13,7 +19,7 @@ import { configManager } from './config.js';
  * const result = await getStandup({
  *   dirs: ['~/projects'],
  *   author: 'John Doe',
- *   days: 2,
+ *   since: 'yesterday',
  * });
  * console.log(result.repos);
  */
@@ -28,14 +34,19 @@ export async function getStandup(userOptions: StandupOptions = {}): Promise<Stan
 
   // Load saved config and merge with provided options
   const savedConfig = configManager.getConfig();
-  const dirs = userOptions.dirs || savedConfig.dirs;
+  const dirs = userOptions.dirs?.length ? userOptions.dirs : savedConfig.dirs;
   const author = userOptions.author || savedConfig.author;
   const days = userOptions.days ?? savedConfig.days;
   const depth = userOptions.depth ?? savedConfig.depth;
   const allAuthors = userOptions.allAuthors || false;
+  const exclude = [...savedConfig.exclude, ...(userOptions.exclude || [])];
+
+  // Validate inputs up front so errors surface before scanning
+  const range = resolveDateRange({ ...userOptions, days });
+  compileExcludePatterns(exclude);
 
   // Expand home directory in paths
-  const expandedDirs = dirs.map((dir) => configManager.expandPath(dir));
+  const expandedDirs = dirs.map((dir) => path.resolve(configManager.expandPath(dir)));
 
   // Get current user if author not specified
   let finalAuthor = author;
@@ -49,28 +60,18 @@ export async function getStandup(userOptions: StandupOptions = {}): Promise<Stan
     depth,
   });
 
-  if (scanResults.length === 0) {
-    return {
-      repos: [],
-      totalCommits: 0,
-      totalMinutes: 0,
-      author: finalAuthor,
-      startDate: dayjs().subtract(days, 'day').toISOString(),
-      endDate: dayjs().toISOString(),
-      allAuthors,
-    };
-  }
-
   // Fetch commits from each repository
   const repositories: Repository[] = [];
+  const commitOptions: StandupOptions = {
+    ...userOptions,
+    author: finalAuthor,
+    days,
+    allAuthors,
+    exclude,
+  };
 
   for (const scanResult of scanResults) {
-    const commits = await getCommitsFromRepo(scanResult.path, {
-      author: finalAuthor,
-      days,
-      allAuthors,
-      ...userOptions,
-    });
+    const commits = await getCommitsFromRepo(scanResult.path, commitOptions, range);
 
     if (commits.length > 0) {
       const estimatedMinutes = estimateTimeSpent(commits);
@@ -87,24 +88,24 @@ export async function getStandup(userOptions: StandupOptions = {}): Promise<Stan
   const totalCommits = repositories.reduce((sum, repo) => sum + repo.commits.length, 0);
   const totalMinutes = repositories.reduce((sum, repo) => sum + repo.estimatedMinutes, 0);
 
-  // Calculate date range
-  const startDate = dayjs().subtract(days, 'day');
-  const endDate = dayjs();
-
   return {
     repos: repositories,
     totalCommits,
     totalMinutes,
     author: finalAuthor,
-    startDate: startDate.toISOString(),
-    endDate: endDate.toISOString(),
+    startDate: range.start.toISOString(),
+    endDate: range.end.toISOString(),
     allAuthors,
+    period: range.label,
+    reposScanned: scanResults.length,
   };
 }
 
 // Export types for TypeScript users
 export type {
   Commit,
+  CommitGroup,
+  DateRange,
   Repository,
   StandupResult,
   StandupOptions
@@ -113,7 +114,9 @@ export type {
 // Export utility functions
 export { formatMinutes, parseTimeString } from './estimator.js';
 export { formatStandupOutput } from './formatter.js';
-export { exportToMarkdown, exportToJson, exportToCsv } from './exporter.js';
+export { exportToMarkdown, exportToJson, exportToCsv, copyToClipboard } from './exporter.js';
 export { configManager } from './config.js';
 export { scanForGitRepos } from './scanner.js';
 export { getCommitsFromRepo, getCurrentUser } from './commits.js';
+export { resolveDateRange, parseDateInput, previousWorkday } from './dates.js';
+export { getCommitType, groupCommitsByType } from './conventional.js';

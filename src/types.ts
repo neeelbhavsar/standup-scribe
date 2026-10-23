@@ -2,6 +2,8 @@
  * All TypeScript types and interfaces for standup-scribe
  */
 
+import type { Dayjs } from 'dayjs';
+
 export interface Commit {
   hash: string;
   message: string;
@@ -29,18 +31,37 @@ export interface StandupResult {
   startDate: string;
   endDate: string;
   allAuthors: boolean;
+  period?: string; // Human-readable range, e.g. "Last 2 days" or "Since Fri Oct 23"
+  reposScanned?: number; // Repos found, including those with no matching commits
 }
 
 export interface StandupOptions {
   dirs?: string[];
   author?: string;
   days?: number;
+  since?: string; // "today", "yesterday" (previous workday), or YYYY-MM-DD
+  until?: string; // "today", "yesterday", or YYYY-MM-DD (inclusive)
+  week?: boolean; // Monday of this week until now
+  lastWeek?: boolean; // Monday to Sunday of last week
   depth?: number;
   branch?: string;
   allAuthors?: boolean;
+  excludeMerges?: boolean;
+  exclude?: string[]; // Regex patterns; matching commit messages are hidden
   quiet?: boolean;
-  output?: 'terminal' | 'markdown' | 'json';
+  output?: 'terminal' | 'markdown' | 'json' | 'csv';
   file?: string;
+}
+
+export interface DateRange {
+  start: Dayjs;
+  end: Dayjs;
+  label: string;
+}
+
+export interface CommitGroup {
+  label: string;
+  commits: Commit[];
 }
 
 export interface ScannerOptions {
@@ -58,6 +79,7 @@ export interface ConfigOptions {
   dirs?: string[];
   days?: number;
   depth?: number;
+  exclude?: string[];
 }
 
 export interface Config {
@@ -65,6 +87,7 @@ export interface Config {
   dirs: string[];
   days: number;
   depth: number;
+  exclude: string[];
 }
 
 export interface TimeBreakdown {
@@ -83,6 +106,7 @@ export interface ExportMarkdownOptions {
   repos: Repository[];
   totalCommits: number;
   totalMinutes: number;
+  groupByType?: boolean;
 }
 
 export interface ExportJsonOptions {

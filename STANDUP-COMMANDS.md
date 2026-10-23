@@ -4,16 +4,24 @@
 
 ### Option 1: Show in Terminal (Best for Daily Meetings)
 ```bash
-standup-scribe --dir ~/projects/my-app --all-authors --days 1
+standup-scribe --dir ~/projects/my-app --all-authors --since yesterday --group --no-merges
 ```
+`--since yesterday` means the previous **workday**, so on Monday it shows Friday's work.
 
-### Option 2: Save as Markdown (Best for Email/Slack)
+### Option 2: Copy to Clipboard (Best for Slack/Teams)
 ```bash
-standup-scribe --dir ~/projects/my-app --all-authors --days 1 \
+standup-scribe --dir ~/projects/my-app --since yesterday --group \
+  --output markdown --copy
+```
+Then just paste (Ctrl+V / Cmd+V) into your chat.
+
+### Option 3: Save as Markdown (Best for Email)
+```bash
+standup-scribe --dir ~/projects/my-app --all-authors --since yesterday \
   --output markdown --file ~/standup-$(date +%Y-%m-%d).md
 ```
 
-### Option 3: Schedule It
+### Option 4: Schedule It
 Run it automatically every morning — see [Automated Daily Reports](#automated-daily-reports).
 
 ---
@@ -29,14 +37,22 @@ standup-scribe [options]
 
 | Option | Value | Description |
 |--------|-------|-------------|
-| `--dir <path>` | `~/projects/my-app` | Project directory to scan |
+| `--dir <path>` | `~/projects/my-app` | Project directory to scan (repeatable) |
 | `--days <N>` | `1`, `7`, `30` | Days to look back (default: 1) |
+| `--since <when>` | `yesterday`, `today`, `2026-10-20` | Start date (`yesterday` = previous workday) |
+| `--until <when>` | `today`, `2026-10-24` | End date, inclusive |
+| `--week` | flag | This week so far (since Monday) |
+| `--last-week` | flag | Last week, Monday to Sunday |
 | `--all-authors` | flag | Show commits from all team members |
 | `--author <name>` | `"Your Name"` | Filter by specific author |
+| `--branch <name>` | `main`, `develop` | Only commits on this branch |
+| `--no-merges` | flag | Hide merge commits |
+| `--exclude <pattern>` | `"^wip"`, `"chore\(deps\)"` | Hide matching commit messages (repeatable) |
+| `--group` | flag | Group by type: Features, Fixes, Chores, … |
 | `--output <format>` | `terminal`, `markdown`, `json`, `csv` | Output format |
 | `--file <path>` | `~/report.md` | Save to file |
+| `--copy` | flag | Copy the report to the clipboard |
 | `--quiet` | flag | No spinners/colors (for scripts) |
-| `--branch <name>` | `main`, `develop` | Filter by branch |
 
 ---
 
@@ -44,7 +60,7 @@ standup-scribe [options]
 
 ### 1. **Daily Standup (Best for meetings)**
 ```bash
-standup-scribe --dir ~/projects/my-app --all-authors --days 1
+standup-scribe --dir ~/projects/my-app --all-authors --since yesterday --group --no-merges
 ```
 - Shows colorful terminal output with spinners
 - Perfect for reading aloud in meetings
@@ -65,8 +81,28 @@ Creates file: `standup-2026-04-14.md`
 
 ### 3. **Weekly Summary (For Project Manager)**
 ```bash
-standup-scribe --dir ~/projects/my-app --all-authors --days 7 \
+# Friday afternoon: this week so far
+standup-scribe --dir ~/projects/my-app --all-authors --week --group --no-merges \
   --output markdown --file ~/weekly-standup.md
+
+# Monday morning: all of last week (Mon–Sun)
+standup-scribe --dir ~/projects/my-app --all-authors --last-week --group --no-merges \
+  --output markdown --file ~/weekly-standup.md
+```
+
+---
+
+### 3b. **Sprint / Date Range Report**
+```bash
+standup-scribe --dir ~/projects/my-app --all-authors \
+  --since 2026-10-12 --until 2026-10-23 --group --no-merges --output markdown
+```
+
+---
+
+### 3c. **Release Branch Only**
+```bash
+standup-scribe --dir ~/projects/my-app --all-authors --branch release/2.0 --days 14 --group
 ```
 
 ---
@@ -137,7 +173,7 @@ standup-scribe --dir ~/projects/my-app --all-authors --days 1 \
 ### Option 1: Manual Command (Run Each Morning)
 ```bash
 # In your terminal, run:
-standup-scribe --dir ~/projects/my-app --all-authors --days 1 \
+standup-scribe --dir ~/projects/my-app --all-authors --since yesterday \
   --output markdown --file ~/reports/standup-$(date +%Y-%m-%d).md
 ```
 
@@ -146,20 +182,20 @@ standup-scribe --dir ~/projects/my-app --all-authors --days 1 \
 ```batch
 @echo off
 REM Requires standup-scribe installed globally (npm install -g standup-scribe)
-standup-scribe --dir D:\projects\my-app --all-authors --days 1 ^
+standup-scribe --dir D:\projects\my-app --all-authors --since yesterday ^
   --output markdown --file C:\Users\%USERNAME%\standup-reports\standup-%DATE:~10,4%-%DATE:~4,2%-%DATE:~7,2%.md
 pause
 ```
 
 2. Schedule via Windows Task Scheduler
-   - Trigger: Daily at 9 AM
+   - Trigger: Weekly, Mon–Fri at 9 AM
    - Action: Run batch file
 
 ### Option 3: Cron Job (Mac/Linux)
 ```bash
 # Edit cron: crontab -e
-# Run daily at 9 AM
-0 9 * * * standup-scribe --dir ~/projects/my-app --all-authors --days 1 \
+# Run at 9 AM on weekdays (Mon–Fri)
+0 9 * * 1-5 standup-scribe --dir ~/projects/my-app --all-authors --since yesterday \
   --output markdown --file $HOME/reports/standup-$(date +\%Y-\%m-\%d).md
 ```
 
@@ -178,14 +214,11 @@ standup-scribe --dir ~/projects/my-app --all-authors --days 1 \
 
 ### 💬 Slack
 ```bash
-# Generate markdown
-standup-scribe --dir ~/projects/my-app --all-authors --days 1 \
-  --output markdown --file ~/standup.md
+# Generate markdown straight to the clipboard
+standup-scribe --dir ~/projects/my-app --since yesterday --group \
+  --output markdown --copy
 
-# Copy content to Slack #standup channel
-# 1. Open the markdown file
-# 2. Copy all content (Ctrl+A, Ctrl+C)
-# 3. Paste in Slack message
+# Then paste (Ctrl+V / Cmd+V) into the Slack #standup channel
 ```
 
 ### 📊 Project Management Tool
@@ -211,6 +244,12 @@ standup-scribe config --dir ~/projects/my-app
 
 # Set default days to look back
 standup-scribe config --days 1
+
+# Always hide WIP commits and dependency bumps
+standup-scribe config --exclude "^wip" --exclude "chore\(deps\)"
+
+# Remove saved exclude patterns
+standup-scribe config --clear-exclude
 ```
 
 ### View Current Config
@@ -285,6 +324,19 @@ standup-scribe --dir ~/projects/my-app --all-authors --days 30
 
 # Or check specific author
 standup-scribe --dir ~/projects/my-app --author "Your Name" --days 7
+
+# On a Monday? --days 1 only covers Sunday. Use the previous workday instead:
+standup-scribe --dir ~/projects/my-app --since yesterday
+
+# Using --branch? Check the branch name exists locally or on origin
+git branch -a
+```
+
+### Clipboard Copy Fails (Linux)
+```bash
+# Install one of these clipboard tools
+sudo apt install wl-clipboard   # Wayland
+sudo apt install xclip          # X11
 ```
 
 ---
@@ -293,7 +345,7 @@ standup-scribe --dir ~/projects/my-app --author "Your Name" --days 7
 
 1. **Create Alias** - Make it shorter:
    ```bash
-   alias standup='standup-scribe --dir ~/projects/my-app --all-authors --days 1'
+   alias standup='standup-scribe --dir ~/projects/my-app --since yesterday --group --no-merges --copy'
    
    # Then just run:
    standup

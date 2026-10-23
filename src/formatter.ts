@@ -2,6 +2,11 @@ import chalk from 'chalk';
 import dayjs from 'dayjs';
 import type { Repository, StandupResult } from './types.js';
 import { formatMinutes } from './estimator.js';
+import { groupCommitsByType } from './conventional.js';
+
+export interface FormatOptions {
+  groupByType?: boolean; // Group commits under Features / Fixes / Chores / ...
+}
 
 /**
  * Check if output should be colorized
@@ -17,6 +22,7 @@ function shouldColorize(quiet: boolean | undefined): boolean {
 export function formatStandupOutput(
   result: StandupResult,
   quiet: boolean = false,
+  options: FormatOptions = {},
 ): string {
   const colorize = shouldColorize(quiet);
   const lines: string[] = [];
@@ -35,7 +41,7 @@ export function formatStandupOutput(
     : `  standup-scribe — ${period}`;
   lines.push(title);
 
-  const authorText = `Author: ${result.author}  |  Repos scanned: ${result.repos.length}`;
+  const authorText = `Author: ${result.author}  |  Repos scanned: ${result.reposScanned ?? result.repos.length}`;
   const authorLine = colorize ? chalk.dim(authorText) : authorText;
   lines.push(`  ${authorLine}`);
 
@@ -44,7 +50,7 @@ export function formatStandupOutput(
 
   // Repositories
   for (const repo of result.repos) {
-    lines.push(formatRepository(repo, colorize));
+    lines.push(formatRepository(repo, colorize, options));
   }
 
   // Summary footer
@@ -68,7 +74,11 @@ export function formatStandupOutput(
 /**
  * Format a single repository section
  */
-function formatRepository(repo: Repository, colorize: boolean): string {
+function formatRepository(
+  repo: Repository,
+  colorize: boolean,
+  options: FormatOptions,
+): string {
   const lines: string[] = [];
 
   // Repo name and path
@@ -79,8 +89,17 @@ function formatRepository(repo: Repository, colorize: boolean): string {
   lines.push(pathText);
 
   // Commits
-  for (const commit of repo.commits) {
-    lines.push(formatCommit(commit, colorize));
+  if (options.groupByType) {
+    for (const group of groupCommitsByType(repo.commits)) {
+      lines.push(colorize ? chalk.magenta(`  ${group.label}`) : `  ${group.label}`);
+      for (const commit of group.commits) {
+        lines.push(`  ${formatCommit(commit, colorize)}`);
+      }
+    }
+  } else {
+    for (const commit of repo.commits) {
+      lines.push(formatCommit(commit, colorize));
+    }
   }
 
   // Time estimate

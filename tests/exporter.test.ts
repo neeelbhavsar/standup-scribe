@@ -52,6 +52,20 @@ describe('exporter', () => {
       expect(markdown).toMatch(/`abc1234`/);
       expect(markdown).toContain('> Estimated time:');
     });
+
+    it('should group commits by type when requested', () => {
+      const markdown = exportToMarkdown({
+        author: 'John',
+        period: 'Last 1 day',
+        repos: mockRepos,
+        totalCommits: 1,
+        totalMinutes: 120,
+        groupByType: true,
+      });
+
+      expect(markdown).toContain('**Features**');
+      expect(markdown.indexOf('**Features**')).toBeLessThan(markdown.indexOf('feat: add feature'));
+    });
   });
 
   describe('exportToJson', () => {
@@ -71,6 +85,7 @@ describe('exporter', () => {
       expect(parsed.totalMinutes).toBe(120);
       expect(parsed.repos.length).toBe(1);
       expect(parsed.repos[0].name).toBe('my-project');
+      expect(parsed.repos[0].commits[0].type).toBe('feat');
     });
 
     it('should include formatted time estimates in JSON', () => {

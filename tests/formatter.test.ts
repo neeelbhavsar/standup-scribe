@@ -111,6 +111,41 @@ describe('formatter', () => {
       // ANSI color codes should not be present in quiet mode
       expect(output).not.toMatch(/\u001b\[\d+m/);
     });
+
+    it('should group commits by type and show repos scanned', () => {
+      const commit = (hash: string, message: string) => ({
+        hash,
+        message,
+        author: { name: 'John', email: 'john@example.com' },
+        timestamp: dayjs().toISOString(),
+        branch: 'main',
+      });
+      const result: StandupResult = {
+        repos: [
+          {
+            name: 'project',
+            path: '/path',
+            estimatedMinutes: 60,
+            commits: [commit('aaa1111', 'fix: crash'), commit('bbb2222', 'feat: login')],
+          },
+        ],
+        totalCommits: 2,
+        totalMinutes: 60,
+        author: 'John',
+        startDate: dayjs().subtract(1, 'day').toISOString(),
+        endDate: dayjs().toISOString(),
+        allAuthors: false,
+        reposScanned: 4,
+      };
+
+      const output = formatStandupOutput(result, true, { groupByType: true });
+
+      expect(output).toContain('Repos scanned: 4');
+      expect(output.indexOf('Features')).toBeGreaterThan(-1);
+      expect(output.indexOf('Features')).toBeLessThan(output.indexOf('feat: login'));
+      expect(output.indexOf('feat: login')).toBeLessThan(output.indexOf('Fixes'));
+      expect(output.indexOf('Fixes')).toBeLessThan(output.indexOf('fix: crash'));
+    });
   });
 
   describe('formatError', () => {

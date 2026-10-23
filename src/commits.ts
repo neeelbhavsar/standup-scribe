@@ -1,14 +1,24 @@
 import { simpleGit, SimpleGit } from 'simple-git';
-import dayjs from 'dayjs';
-import type { Commit, StandupOptions } from './types.js';
+import type { Commit, DateRange, StandupOptions } from './types.js';
+import { resolveDateRange } from './dates.js';
+
+const LOG_FORMAT = {
+  hash: '%H',
+  date: '%aI',
+  message: '%s',
+  author_name: '%an',
+  author_email: '%ae',
+  source: '%S',
+};
 
 /**
  * Fetch commits from a single git repository
- * Filters by date range, author, and optionally branch
+ * Filters by date range, author, branch, merges, and excluded message patterns
  */
 export async function getCommitsFromRepo(
   repoPath: string,
   options: StandupOptions,
+  range: DateRange = resolveDateRange(options),
 ): Promise<Commit[]> {
   const git: SimpleGit = simpleGit(repoPath);
 
@@ -23,24 +33,28 @@ export async function getCommitsFromRepo(
     return [];
   }
 
-  // Calculate date range
-  const days = options.days || 1;
-  const endDate = dayjs();
-  const startDate = endDate.subtract(days, 'day');
-
-  // Build git log options
-  const gitLogOptions: any = {
-    '--all': null, // Search all branches
-    '--date': 'iso-strict',
+  // Build git log options (insertion order is the argument order)
+  const gitLogOptions: Record<string, string | null> = {
+    '--source': null, // Report the ref each commit was reached from (%S)
+    '--since': range.start.toISOString(),
+    '--until': range.end.toISOString(),
   };
 
-  // Add date filters
-  gitLogOptions['--since'] = startDate.toISOString();
-  gitLogOptions['--until'] = endDate.toISOString();
-
-  // Add branch filter if specified
   if (options.branch) {
-    // Will be added to the command differently
+    const ref = await resolveBranchRef(git, options.branch);
+    if (!ref) {
+      // Branch doesn't exist in this repo
+      return [];
+    }
+    gitLogOptions[ref] = null;
+  } else {
+    // Search all branches, but skip stash entries
+    gitLogOptions['--exclude=refs/stash'] = null;
+    gitLogOptions['--all'] = null;
+  }
+
+  if (options.excludeMerges) {
+    gitLogOptions['--no-merges'] = null;
   }
 
   // Add author filter if not showing all authors
@@ -48,10 +62,13 @@ export async function getCommitsFromRepo(
     gitLogOptions['--author'] = options.author;
   }
 
-  try {
-    const log = await git.log(gitLogOptions);
+  const excludePatterns = compileExcludePatterns(options.exclude);
 
-    const commits: Commit[] = log.all
+  try {
+    const log = await git.log<typeof LOG_FORMAT>({ ...gitLogOptions, format: LOG_FORMAT });
+
+    return log.all
+      .filter((commit) => !excludePatterns.some((pattern) => pattern.test(commit.message)))
       .map((commit) => ({
         hash: commit.hash.substring(0, 7),
         message: commit.message,
@@ -60,45 +77,61 @@ export async function getCommitsFromRepo(
           email: commit.author_email || 'unknown@example.com',
         },
         timestamp: commit.date || new Date().toISOString(),
-        branch: commit.refs ? extractBranchFromRefs(commit.refs) : 'unknown',
-      }))
-      .filter((commit) => {
-        // Additional filtering by branch if needed
-        if (options.branch && commit.branch !== options.branch) {
-          return false;
-        }
-        return true;
-      });
-
-    return commits;
-  } catch (error) {
+        branch: options.branch || branchFromSource(commit.source),
+      }));
+  } catch {
     // Handle git command errors gracefully
     return [];
   }
 }
 
 /**
- * Extract branch name from git refs string
- * Example: "HEAD -> main, origin/main" => "main"
+ * Compile --exclude patterns into case-insensitive regular expressions
+ * Throws a readable error for invalid patterns
  */
-function extractBranchFromRefs(refs: string): string {
-  const headMatch = refs.match(/HEAD -> ([^,]+)/);
-  if (headMatch) {
-    return headMatch[1].trim();
-  }
-
-  const parts = refs.split(',').map((s) => s.trim());
-  if (parts.length > 0) {
-    // Return first non-origin ref
-    const nonOrigin = parts.find((p) => !p.startsWith('origin/'));
-    if (nonOrigin) {
-      return nonOrigin.replace(/^(HEAD -> )?/, '');
+export function compileExcludePatterns(patterns: string[] = []): RegExp[] {
+  return patterns.map((pattern) => {
+    try {
+      return new RegExp(pattern, 'i');
+    } catch {
+      throw new Error(`Invalid --exclude pattern "${pattern}". It must be a valid regular expression.`);
     }
-    // Fall back to first ref minus origin/
-    return parts[0].replace('origin/', '');
+  });
+}
+
+/**
+ * Find the full ref for a branch name: local branch first, then origin, then any revision
+ * Returns null if the branch doesn't exist in this repo
+ */
+async function resolveBranchRef(git: SimpleGit, branch: string): Promise<string | null> {
+  const candidates = [`refs/heads/${branch}`, `refs/remotes/origin/${branch}`, branch];
+
+  for (const ref of candidates) {
+    try {
+      await git.raw(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`]);
+      return ref;
+    } catch {
+      // Try the next candidate
+    }
   }
 
-  return 'unknown';
+  return null;
+}
+
+/**
+ * Turn a --source ref into a branch name
+ * Example: "refs/heads/main" => "main", "refs/remotes/origin/feature/x" => "feature/x"
+ */
+export function branchFromSource(source: string | undefined): string {
+  const ref = (source || '').trim();
+  if (!ref) {
+    return 'unknown';
+  }
+
+  return ref
+    .replace(/^refs\/heads\//, '')
+    .replace(/^refs\/remotes\/[^/]+\//, '')
+    .replace(/^refs\/tags\//, '');
 }
 
 /**
