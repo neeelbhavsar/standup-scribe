@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 📖 Command recipes
+    url: https://github.com/neeelbhavsar/standup-scribe/blob/main/STANDUP-COMMANDS.md
+    about: Copy-paste commands for daily standups, weekly reports, scheduling, and sharing

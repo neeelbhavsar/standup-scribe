@@ -1,0 +1,59 @@
+name: 🐛 Bug report
+description: Something isn't working as expected
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for taking the time to report this! The more detail you give, the faster it can be fixed.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect, and what happened instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: command
+    attributes:
+      label: Command you ran
+      description: The full standup-scribe command, with any personal paths or names replaced.
+      render: bash
+      placeholder: standup-scribe --dir ~/projects --since yesterday --group
+    validations:
+      required: true
+
+  - type: textarea
+    id: output
+    attributes:
+      label: Output or error message
+      render: text
+
+  - type: input
+    id: version
+    attributes:
+      label: standup-scribe version
+      description: Output of `standup-scribe --version`
+      placeholder: 1.1.0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows
+        - macOS
+        - Linux
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: node
+    attributes:
+      label: Node.js and Git versions
+      description: Output of `node --version` and `git --version`
+      placeholder: v22.11.0, git version 2.47.0
