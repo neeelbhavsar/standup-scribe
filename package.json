@@ -1,6 +1,6 @@
 {
   "name": "standup-scribe",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Turn your git commits across every local repo into daily standups, weekly reviews, and timesheets — with automatic time estimates",
   "license": "MIT",
   "author": "Neel Bhavsar (https://github.com/neeelbhavsar)",

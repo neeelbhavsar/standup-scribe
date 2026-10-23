@@ -1,8 +1,10 @@
 import fs from 'fs';
 import path from 'path';
+import { spawn } from 'child_process';
 import dayjs from 'dayjs';
-import type { Repository, ExportMarkdownOptions, ExportJsonOptions } from './types.js';
+import type { Commit, Repository, ExportMarkdownOptions, ExportJsonOptions } from './types.js';
 import { formatMinutes } from './estimator.js';
+import { getCommitType, groupCommitsByType } from './conventional.js';
 
 /**
  * Export standup to markdown format
@@ -24,12 +26,18 @@ export function exportToMarkdown(options: ExportMarkdownOptions): string {
     lines.push(`### ${repo.name}`);
     lines.push('');
 
-    for (const commit of repo.commits) {
-      const time = dayjs(commit.timestamp).format('HH:mm');
-      lines.push(`- \`${commit.hash}\` ${commit.message} *(\`${time}\`)*`);
+    if (options.groupByType) {
+      for (const group of groupCommitsByType(repo.commits)) {
+        lines.push(`**${group.label}**`);
+        lines.push('');
+        lines.push(...group.commits.map(formatMarkdownCommit));
+        lines.push('');
+      }
+    } else {
+      lines.push(...repo.commits.map(formatMarkdownCommit));
+      lines.push('');
     }
 
-    lines.push('');
     lines.push(`> Estimated time: ${formatMinutes(repo.estimatedMinutes)}`);
     lines.push('');
   }
@@ -42,6 +50,11 @@ export function exportToMarkdown(options: ExportMarkdownOptions): string {
   );
 
   return lines.join('\n');
+}
+
+function formatMarkdownCommit(commit: Commit): string {
+  const time = dayjs(commit.timestamp).format('HH:mm');
+  return `- \`${commit.hash}\` ${commit.message} *(\`${time}\`)*`;
 }
 
 /**
@@ -61,6 +74,7 @@ export function exportToJson(options: ExportJsonOptions): string {
       commits: repo.commits.map((commit) => ({
         hash: commit.hash,
         message: commit.message,
+        type: getCommitType(commit.message),
         author: commit.author,
         timestamp: commit.timestamp,
         branch: commit.branch,
@@ -85,7 +99,7 @@ export function exportToCsv(options: {
   const lines: string[] = [];
 
   // Header
-  lines.push('Repo,Commit Hash,Message,Author,Timestamp,Estimated Minutes');
+  lines.push('Repo,Commit Hash,Message,Author,Timestamp,Estimated Minutes,Branch,Type');
 
   // Data rows
   for (const repo of options.repos) {
@@ -97,6 +111,8 @@ export function exportToCsv(options: {
         `"${commit.author.name}"`,
         commit.timestamp,
         repo.estimatedMinutes,
+        `"${commit.branch.replace(/"/g, '""')}"`,
+        getCommitType(commit.message),
       ].join(',');
       lines.push(row);
     }
@@ -120,34 +136,50 @@ export async function saveToFile(filePath: string, content: string): Promise<voi
 }
 
 /**
- * Copy text to clipboard (requires platform-specific handling)
+ * Clipboard commands to try, per platform, in order
  */
-export async function copyToClipboard(text: string): Promise<void> {
-  // This is a basic implementation. In a real app, you might use
-  // the 'clipboardy' or 'copy-paste' package
-  try {
-    const platform = process.platform;
-
-    if (platform === 'darwin') {
-      // macOS
-      const proc = require('child_process').spawn('pbcopy');
-      proc.stdin.write(text);
-      proc.stdin.end();
-    } else if (platform === 'win32') {
-      // Windows - use clip.exe
-      const proc = require('child_process').spawn('clip');
-      proc.stdin.write(text);
-      proc.stdin.end();
-    } else if (platform === 'linux') {
-      // Linux - try xclip or xsel
-      const proc = require('child_process').spawn('xclip', ['-selection', 'clipboard']);
-      proc.stdin.write(text);
-      proc.stdin.end();
-    }
-  } catch {
-    // Silently fail if clipboard is not available
-    return;
+function clipboardCommands(): Array<{ command: string; args: string[] }> {
+  if (process.platform === 'darwin') {
+    return [{ command: 'pbcopy', args: [] }];
   }
+  if (process.platform === 'win32') {
+    return [{ command: 'clip', args: [] }];
+  }
+  return [
+    { command: 'wl-copy', args: [] },
+    { command: 'xclip', args: ['-selection', 'clipboard'] },
+    { command: 'xsel', args: ['--clipboard', '--input'] },
+  ];
+}
+
+/**
+ * Pipe text into a clipboard command; resolves true if it exited cleanly
+ */
+function pipeToCommand(command: string, args: string[], input: Buffer): Promise<boolean> {
+  return new Promise((resolve) => {
+    const proc = spawn(command, args, { stdio: ['pipe', 'ignore', 'ignore'] });
+    proc.on('error', () => resolve(false)); // e.g. command not installed
+    proc.on('close', (code) => resolve(code === 0));
+    proc.stdin.on('error', () => resolve(false));
+    proc.stdin.end(input);
+  });
+}
+
+/**
+ * Copy text to the system clipboard
+ * Returns false if no clipboard tool is available (e.g. xclip missing on Linux)
+ */
+export async function copyToClipboard(text: string): Promise<boolean> {
+  // clip.exe garbles non-ASCII text (—, ·, emoji) unless it is sent as UTF-16LE
+  const input = Buffer.from(text, process.platform === 'win32' ? 'utf16le' : 'utf-8');
+
+  for (const { command, args } of clipboardCommands()) {
+    if (await pipeToCommand(command, args, input)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 /**

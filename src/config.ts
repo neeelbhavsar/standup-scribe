@@ -33,6 +33,11 @@ class ConfigManager {
           default: 3,
           minimum: 1,
         },
+        exclude: {
+          type: 'array',
+          items: { type: 'string' },
+          default: [],
+        },
       },
     });
   }
@@ -46,6 +51,7 @@ class ConfigManager {
       dirs: this.conf.get('dirs') || [process.cwd(), os.homedir()],
       days: this.conf.get('days') || 1,
       depth: this.conf.get('depth') || 3,
+      exclude: this.conf.get('exclude') || [],
     };
   }
 
@@ -64,6 +70,9 @@ class ConfigManager {
     }
     if (options.depth !== undefined) {
       this.conf.set('depth', options.depth);
+    }
+    if (options.exclude !== undefined) {
+      this.conf.set('exclude', options.exclude);
     }
   }
 
