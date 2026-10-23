@@ -2,13 +2,16 @@
 // Prints the demo directory so the tape can scan it. Safe to re-run: it starts fresh each time.
 //
 //   node docs/demo-setup.mjs
+//
+// Repos go in <project>/.demo (git-ignored) rather than the OS temp folder, so the
+// recorded output shows a neutral path instead of the recording user's home directory.
 
 import { execFileSync } from 'child_process';
 import fs from 'fs';
-import os from 'os';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
-const root = path.join(os.tmpdir(), 'standup-scribe-demo');
+const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '.demo');
 const gitconfig = path.join(root, '.gitconfig');
 
 // Previous workday: Monday (and the weekend) go back to Friday

@@ -13,9 +13,12 @@
   <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
 </p>
 
-<!-- Demo GIF: run `vhs docs/demo.tape` (see CONTRIBUTING.md), then uncomment:
-<p align="center"><img src="docs/demo.gif" alt="standup-scribe demo" width="800"></p>
--->
+<p align="center">
+  <img src="docs/demo.gif" alt="standup-scribe turning Friday's commits across two repos into a grouped summary, then copying it as Markdown for Slack" width="800">
+</p>
+
+<details>
+<summary>See the output as text</summary>
 
 ```console
 $ npx standup-scribe --since yesterday --group --exclude ^wip
@@ -46,6 +49,8 @@ $ npx standup-scribe --since yesterday --group --exclude ^wip
   Total: 7 commits across 2 repos
   Estimated total time: ~4h 44m
 ```
+
+</details>
 
 ## Why standup-scribe?
 

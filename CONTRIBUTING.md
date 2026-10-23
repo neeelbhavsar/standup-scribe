@@ -79,11 +79,15 @@ npm link
 
 ## Recording the demo GIF
 
-The README demo is generated from [`docs/demo.tape`](./docs/demo.tape) with [VHS](https://github.com/charmbracelet/vhs):
+The README demo is generated with [VHS](https://github.com/charmbracelet/vhs) from throwaway repos and a fictional author, so no real data ends up in the GIF:
 
 ```bash
-vhs docs/demo.tape   # writes docs/demo.gif
+npm run build
+vhs docs/demo.tape           # macOS / Linux (bash)
+vhs docs/demo-windows.tape   # Windows (PowerShell)
 ```
+
+Both write `docs/demo.gif`. VHS needs `ttyd` and `ffmpeg` on your PATH. On Windows: `winget install charmbracelet.vhs tsl0922.ttyd Gyan.FFmpeg`, then open a **new** terminal so the PATH change takes effect. The recording runs `--copy`, so it replaces whatever is on your clipboard.
 
 ## Code of conduct
 
