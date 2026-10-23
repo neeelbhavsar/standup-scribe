@@ -1,11 +1,59 @@
-# standup-scribe
+<h1 align="center">standup-scribe</h1>
 
-> Summarize your git commits across all local repositories for daily standups, weekly reviews, and accurate timesheets.
+<p align="center">
+  <strong>Stop scrolling <code>git log</code> before standup.</strong><br>
+  One command turns yesterday's commits across every repo into a clean, grouped summary, ready to paste into Slack.
+</p>
 
-[![npm version](https://img.shields.io/npm/v/standup-scribe.svg)](https://www.npmjs.com/package/standup-scribe)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Node.js 18+](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](https://nodejs.org/)
-[![Downloads](https://img.shields.io/npm/dm/standup-scribe.svg)](https://www.npmjs.com/package/standup-scribe)
+<p align="center">
+  <a href="https://github.com/neeelbhavsar/standup-scribe/actions/workflows/ci.yml"><img src="https://github.com/neeelbhavsar/standup-scribe/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://www.npmjs.com/package/standup-scribe"><img src="https://img.shields.io/npm/v/standup-scribe.svg" alt="npm version"></a>
+  <a href="https://www.npmjs.com/package/standup-scribe"><img src="https://img.shields.io/npm/dm/standup-scribe.svg" alt="npm downloads"></a>
+  <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg" alt="Node.js 18+"></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
+</p>
+
+<!-- Demo GIF: run `vhs docs/demo.tape` (see CONTRIBUTING.md), then uncomment:
+<p align="center"><img src="docs/demo.gif" alt="standup-scribe demo" width="800"></p>
+-->
+
+```console
+$ npx standup-scribe --since yesterday --group --exclude ^wip
+
+  standup-scribe — Fri Oct 23 to Mon Oct 26
+  Author: Alex Rivera  |  Repos scanned: 2
+
+ payments-api
+  Features
+    [09:12]  6378cfa  feat(checkout): add Apple Pay support
+  Fixes
+    [10:04]  ebbcaed  fix: retry webhook delivery on 502
+  Tests
+    [10:41]  80a8c2e  test: cover refund edge cases
+  Estimated time: ~1h 59m  (3 commits)
+
+ web-dashboard
+  Features
+    [14:05]  f2f0c15  feat: export invoices as CSV
+  Fixes
+    [14:52]  0d7bc1f  fix(ui): date picker off by one day
+  Documentation
+    [16:20]  352f8cd  docs: add dashboard setup guide
+  Chores
+    [15:37]  4da4c86  chore(deps): bump vite to 6.0
+  Estimated time: ~2h 45m  (4 commits)
+
+  Total: 7 commits across 2 repos
+  Estimated total time: ~4h 44m
+```
+
+## Why standup-scribe?
+
+- **It's Monday and you can't remember Friday.** `--since yesterday` means the previous *workday*, so Monday shows Friday.
+- **Your work is spread over five repos.** It finds every git repo under your folders and reads them all at once.
+- **`git log` is noisy.** Merges, `wip` commits and dependency bumps are one flag away from disappearing.
+- **You need it in Slack, a doc, or a timesheet.** Copy it to the clipboard, or export it as Markdown, JSON or CSV with time estimates.
+- **Zero setup.** No accounts, no tokens, nothing leaves your machine. It only reads your local git history.
 
 ## Features
 
@@ -228,7 +276,7 @@ standup-scribe --quiet --output json --file report.json
 
 ## Programmatic API
 
-Use `standup-scribe` as a library in your Node.js scripts:
+Use `standup-scribe` as a library in your Node.js scripts. It's an ES module: use `import`. On Node 22+, `require()` also works.
 
 ```typescript
 import { getStandup, formatMinutes } from 'standup-scribe';
@@ -444,14 +492,9 @@ standup-scribe
 
 ## Contributing
 
-Contributions welcome! Please:
+Contributions are welcome, from typo fixes to new features! See [CONTRIBUTING.md](./CONTRIBUTING.md) for setup, the project layout, and the pull request checklist. Issues labelled [`good first issue`](https://github.com/neeelbhavsar/standup-scribe/labels/good%20first%20issue) are a great place to start.
 
-1. Fork [neeelbhavsar/standup-scribe](https://github.com/neeelbhavsar/standup-scribe)
-2. Create a feature branch (`git checkout -b feature/my-feature`)
-3. Add tests for your changes
-4. Run `npm run build && npm test`
-5. Commit with a clear message
-6. Open a pull request
+If standup-scribe saves you time, a ⭐ on GitHub helps other developers find it.
 
 ## Development
 
@@ -489,6 +532,8 @@ MIT © 2026 [Neel Bhavsar](https://github.com/neeelbhavsar) — see [LICENSE](./
 - 🐛 Saved `days`, `depth`, and `author` from config are no longer overridden by CLI defaults
 - 🐛 "No repositories found" is no longer shown when repos were found but had no commits in range
 - 🐛 Stash entries no longer appear as commits
+- 📦 The package is now ESM-only. The previous CommonJS build crashed on load because its dependencies are ESM-only
+- 🤝 CI on Linux, macOS and Windows; automatic npm publishing on GitHub releases; contributing guide and issue templates
 
 ### 1.0.0 (2026-10-24)
 

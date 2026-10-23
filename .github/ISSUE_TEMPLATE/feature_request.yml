@@ -1,0 +1,32 @@
+name: 💡 Feature request
+description: Suggest an idea that would make standup-scribe more useful
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: Describe the situation, e.g. "Every Monday I have to…"
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: What would you like to happen?
+      description: A command or output example helps a lot.
+      placeholder: standup-scribe --since yesterday --post slack
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you've considered
+
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Contribution
+      options:
+        - label: I'd be willing to open a pull request for this

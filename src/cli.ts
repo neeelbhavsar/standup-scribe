@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { createRequire } from 'module';
 import { Command } from 'commander';
 import ora from 'ora';
 import { getStandup } from './index.js';
@@ -15,9 +16,10 @@ import { configManager } from './config.js';
 import { compileExcludePatterns } from './commits.js';
 import type { StandupOptions } from './types.js';
 
-const pkg = {
-  version: '1.1.0',
-  name: 'standup-scribe',
+// package.json sits one level up from both src/ (dev) and dist/ (published)
+const pkg = createRequire(import.meta.url)('../package.json') as {
+  name: string;
+  version: string;
 };
 
 const OUTPUT_FORMATS = ['terminal', 'markdown', 'json', 'csv'];
